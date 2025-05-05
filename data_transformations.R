@@ -29,4 +29,4 @@ final_data_per_dir_per_cast_per_genre = final_data |>
   separate_rows(cast, sep = ",") |> mutate(cast = str_trim(cast)) |>
   separate_rows(genre, sep = "•") |> mutate(genre = str_trim(genre))
 
-write_csv(final_data_per_dir_per_cast_per_genre, "cleaned_dataset__master.csv")      
+write_csv(final_data_per_dir_per_cast_per_genre, "cleaned_dataset_master.csv")      
