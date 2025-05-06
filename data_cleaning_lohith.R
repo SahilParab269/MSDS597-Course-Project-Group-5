@@ -14,7 +14,7 @@ scrape_flickchart_page <- function(page_num) {
   page <- read_html(url)
   
   titles <- page %>%
-    html_elements("#chart a span") %>%.  
+    html_elements("#chart a span") %>%  
     html_text(trim = TRUE) %>%
     .[!str_detect(., "http[s]?://")] %>%  # Remove any link-like text
     .[. != ""]                            # Remove empty strings
