@@ -51,7 +51,7 @@ actor_summary <- cast_stats %>%
     .groups = "drop"
   ) %>%
   arrange(desc(freq)) %>%
-  slice_max(freq, n = 1000)  # Limit to top 200 actors for clarity
+  slice_max(freq, n = 1000)  
 
 # Step 3: Map ratings to color scale
 actor_summary$color <- col_numeric(
