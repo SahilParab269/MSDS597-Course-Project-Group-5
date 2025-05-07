@@ -26,6 +26,7 @@ scrape_flickchart_page <- function(page_num) {
 all_titles <- map_dfr(1:40, scrape_flickchart_page)
 
 
+
 # Define function to scrape one page of Year
 scrape_flickchart_page <- function(page_num) {
   url <- paste0("https://www.flickchart.com/charts.aspx?perpage=10000&page=", page_num)
@@ -189,4 +190,6 @@ movie_data <- movie_data %>%
   )
 
 # Save this cleaned dataset to CSV
-write_csv(movie_data, "cleaned_dataset_lohith.csv")          
+write_csv(movie_data, "cleaned_dataset_lohith.csv")
+
+
