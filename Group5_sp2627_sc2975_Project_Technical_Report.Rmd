@@ -1,0 +1,873 @@
+---
+title: "Course Project - Technical Report and Appendices"
+author: "Sai Lohith Chimbili (sc2975) & Sahil Parab (sp2627)"
+date: "2025-05-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE,message = FALSE)
+```
+
+## The project contains the following directories and key files:
+
+#### data/ -
+
+cleaned_dataset_master.csv<br>
+cleaned_dataset_sahil.csv<br>
+cleaned_dataset_lohith.csv<br>
+cleaned_dataset_genre_perROW.csv<br>
+cleaned_dataset_director_perROW.csv<br>
+cleaned_dataset_cast_perROW.csv<br>
+
+#### functions/ -
+
+data_cleaning_lohith.R<br>
+data_cleaning_sahil.R<br>
+data_transformations.R<br>
+
+#### results/ -
+
+Group5_sp2627_sc2975_Project_Technical_Report.Rmd<br>
+Group5_sp2627_sc2975_Project_Technical_Report.html<br>
+Group5_sp2627_sc2975_Project_Business_Report.pdf<br>
+
+## Loading necessary libraries
+
+```{r}
+# Load required libraries
+library(tidyverse)
+library(rvest)
+library(stringr)
+library(httr)
+library(jsonlite)
+```
+
+<u><p style="font-size:40px;">Appendix A : Data Wrangling, Cleaning and Integration</p></u>
+
+## Appendix A.1 - Data Web Scrapping from Flickchart
+
+### Appendix A.1.1 - Web Scrapping for 'title' metadata column
+
+```{r}
+# Define function to scrape one page of Title
+scrape_flickchart_page <- function(page_num) {
+  url <- paste0("https://www.flickchart.com/charts.aspx?perpage=10000&page=", page_num)
+  #message("Scraping page: ", page_num)
+  
+  page <- read_html(url)
+  
+  titles <- page %>%
+    html_elements("#chart a span") %>%  
+    html_text(trim = TRUE) %>%
+    .[!str_detect(., "http[s]?://")] %>%  # Remove any link-like text
+    .[. != ""]                            # Remove empty strings
+  
+  tibble(title = titles, page = page_num)
+}
+
+# Scrape pages 1 to 40
+all_titles <- map_dfr(1:40, scrape_flickchart_page)
+nrow(all_titles)
+
+all_titles %>% head(10) %>% print()
+```
+
+### Appendix A.1.2 - Web Scrapping for 'year' metadata column
+
+```{r}
+# Define function to scrape one page of Year
+scrape_flickchart_page <- function(page_num) {
+  url <- paste0("https://www.flickchart.com/charts.aspx?perpage=10000&page=", page_num)
+  #message("Scraping page: ", page_num)
+  
+  page <- read_html(url)
+  
+  titles <- page %>%
+    html_elements(".chartsYear") %>%
+    html_text(trim = TRUE) %>%
+    .[!str_detect(., "http[s]?://")] %>%  # Remove any link-like text
+    .[. != ""]                            # Remove empty strings
+  
+  tibble(year = titles, page = page_num)
+}
+
+# Scrape pages 1 to 40
+all_years <- map_dfr(1:40, scrape_flickchart_page)
+nrow(all_years)
+
+all_years %>% head(10) %>% print()
+```
+
+### Appendix A.1.3 - Web Scrapping for 'duration' metadata column
+
+```{r}
+# Define function to scrape one page of Duration in min
+scrape_flickchart_page <- function(page_num) {
+  url <- paste0("https://www.flickchart.com/charts.aspx?perpage=10000&page=", page_num)
+  #message("Scraping page: ", page_num)
+  
+  page <- read_html(url)
+  
+  titles <- page %>%
+    html_elements(".minutes") %>%
+    html_text(trim = TRUE) %>%
+    .[!str_detect(., "http[s]?://")] %>%  # Remove any link-like text
+    .[. != ""]                            # Remove empty strings
+  
+  tibble(duration = titles, page = page_num)
+}
+
+# Scrape pages 1 to 40
+all_duration <- map_dfr(1:40, scrape_flickchart_page)
+nrow(all_duration)
+
+all_duration %>% head(10) %>% print()
+```
+
+### Appendix A.1.4 - Web Scrapping for 'director' metadata column
+
+```{r}
+# Define function to scrape one page of Director name
+scrape_flickchart_page <- function(page_num) {
+  url <- paste0("https://www.flickchart.com/charts.aspx?perpage=10000&page=", page_num)
+  #message("Scraping page: ", page_num)
+  
+  page <- read_html(url)
+  
+  titles <- page %>%
+    html_elements(".director .filterLink:nth-child(1)") %>%
+    html_text(trim = TRUE) %>%
+    .[!str_detect(., "http[s]?://")] %>%  # Remove any link-like text
+    .[. != ""]                            # Remove empty strings
+  
+  tibble(director = titles, page = page_num)
+}
+
+# Scrape pages 1 to 40
+all_director <- map_dfr(1:40, scrape_flickchart_page)
+nrow(all_director)
+
+all_director %>% head(10) %>% print()
+```
+
+### Appendix A.1.5 - Web Scrapping for 'genre' metadata column
+
+```{r}
+# Define function to scrape one page of Genre
+scrape_flickchart_page <- function(page_num) {
+  url <- paste0("https://www.flickchart.com/charts.aspx?perpage=10000&page=", page_num)
+  message("Scraping page: ", page_num)
+  
+  page <- read_html(url)
+  
+  titles <- page %>%
+    html_elements(".genre") %>%
+    html_text(trim = TRUE) %>%
+    .[!str_detect(., "http[s]?://")] %>%  # Remove any link-like text
+    .[. != ""]                            # Remove empty strings
+  
+  tibble(genre = titles, page = page_num)
+}
+
+# Scrape pages 1 to 40
+all_genre <- map_dfr(1:40, scrape_flickchart_page)
+nrow(all_genre)
+```
+
+### Appendix A.1.6 - Fixing 'genre' missing metadata
+
+```{r}
+# ----------------------------
+# Diagnose issue: Check how many genres per page
+# ----------------------------
+df <- all_genre %>%
+  group_by(page) %>%
+  summarise(count = n())
+
+# ----------------------------
+# Fix issue: Page 30 has a missing genre at position 75
+# We'll manually insert "Comedy • Comedy Drama" there
+# and shift subsequent rows down by one position
+# ----------------------------
+
+# Take rows 1 to 74 as-is
+all_genre_1 <- all_genre %>% slice(1:74)
+
+# Manually add the missing 75th genre
+all_genre_2 <- data.frame(genre = "Comedy • Comedy Drama", page = 30)
+
+# Take the remaining rows from 75 onwards
+all_genre_3 <- all_genre %>% slice(75:9999)
+
+# Combine all into final corrected dataset
+all_genre_final <- bind_rows(all_genre_1, all_genre_2, all_genre_3)
+nrow(all_genre_final)
+
+all_genre_final %>% head(10) %>% print()
+```
+
+### Appendix A.1.7 - Web Scrapping for 'cast' metadata column
+
+```{r}
+# Define function to scrape one page of Cast names
+scrape_flickchart_page <- function(page_num) {
+     url <- paste0("https://www.flickchart.com/charts.aspx?perpage=10000&page=", page_num)
+     message("Scraping page: ", page_num)
+     
+     page <- read_html(url)
+     
+     titles <- page %>%
+         html_elements(".director") %>%
+         html_text(trim = TRUE) %>%
+         .[!str_detect(., "http[s]?://")] %>%  # Remove any link-like text
+         .[. != ""]                            # Remove empty strings
+     
+     tibble(cast = titles, page = page_num)
+}
+
+# Scrape pages 1 to 40
+all_cast <- map_dfr(1:40, scrape_flickchart_page)
+nrow(all_cast)
+
+all_cast %>% head(10) %>% print()
+```
+
+### Appendix A.1.8 - Cleaning 'cast' metadata column
+
+```{r}
+# ----------------------------
+# Step 1: Clean up the raw 'title' text from all_cast
+# ----------------------------
+all_cast_clean <- all_cast %>%
+  mutate(
+    # Remove unwanted control characters: carriage returns (\r), new lines (\n), tabs (\t)
+    cast = str_replace_all(cast, "[\r\n\t]", ""),
+    
+    # Remove extra white spaces from start, end, and collapse multiple spaces in between
+    cast = str_squish(cast)
+  )
+
+# ----------------------------
+# Step 2: Extract only the cast part from the cleaned titles
+# ----------------------------
+all_cast_clean1 <- all_cast_clean %>%
+  mutate(
+    # Extract everything that comes after the phrase "Starring: "
+    cast = str_extract(cast, "(?<=Starring: ).*")
+  )
+nrow(all_cast_clean1)
+
+all_cast_clean1 %>% head(10) %>% print()
+```
+
+### Appendix A.1.9 - Combining all metadata columns, cleaning the duration to make it numeric and obtain clean dataset
+
+```{r}
+# Select and rename relevant columns from each dataset
+cast <- all_cast_clean1 %>% select(cast)
+director <- all_director %>% select(director)
+duration <- all_duration %>% select(duration)
+genre <- all_genre_final %>% select(genre)
+year <- all_years %>% select(year)
+title <- all_titles %>% select(title)
+
+# Combine all components into a single dataset
+movie_data <- bind_cols(title, year, director, duration, cast, genre)
+
+# Step 3: Clean the 'duration' column to make it numeric-ready
+movie_data <- movie_data %>%
+  mutate(
+    duration = str_replace_all(duration, ",", ""),          # Remove commas
+    duration = str_remove(duration, "\\s*min\\.?$"),        # Remove "min." or "min" at end (with optional space)
+    duration = str_squish(duration),                        # Squash any extra spaces
+    duration = as.numeric(duration)                         # Convert to numeric
+  )
+
+movie_data |> head(10) |> print()
+
+# Save this cleaned dataset to CSV
+#write_csv(movie_data, "cleaned_dataset_lohith.csv") 
+```
+
+## Appendix A.2 - API calls and Data fetching from OMDBAPI for Integration 
+
+### Appendix A.2.1 - Fetch movies between 1950 to 2024 for further processing
+
+```{r}
+#Filtering to consider only movies from year 1950 to 2024
+data = movie_data |> filter(year >= 1950 & year <= 2024) |> arrange(year)
+nrow(data)
+```
+
+### Appendix A.2.2 - API Calls to fetch the ratings from OMDBAPI (Warning: Total run time for calls exceeds 30mins)
+
+```{r}
+# API key
+api_key = "3b100719"
+
+#Function definition to fetch IMDB ratings from OMDBAPI database using API key
+get_rating = function(title, year) {
+  title = str_squish(title)
+  year = as.integer(year)
+  
+  tryCatch(
+  {
+    # First try with year
+    url1 = paste0("http://www.omdbapi.com/?t=",
+                   URLencode(title), "&y=", year, "&apikey=", api_key)
+    res1 = httr::GET(url1)
+    content1 = fromJSON(content(res1, as = "text"))
+    
+    if (!is.null(content1$imdbRating) && content1$imdbRating != "N/A")
+    {
+      return(as.numeric(content1$imdbRating))
+    }
+    
+    # Fallback: try without year
+    url2 = paste0("http://www.omdbapi.com/?t=", URLencode(title), "&apikey=", api_key)
+    res2 = httr::GET(url2)
+    content2 = fromJSON(content(res2, as = "text"))
+    
+    if (!is.null(content2$imdbRating) && content2$imdbRating != "N/A") 
+    {
+      return(as.numeric(content2$imdbRating))
+    }
+    return(NA)
+  }, 
+  error = function(e) 
+  {
+    return(NA)
+  })
+}
+
+#Fetching the IMDB ratings using funtion call
+movies_with_ratings = data |>
+  rowwise() |>
+  mutate(imdb_rating = get_rating(title, year)) |>
+  ungroup()
+
+#Check for a fetched ratings
+movies_with_ratings |> select(title, imdb_rating) |> head(10) |> print()
+
+movies_with_ratings |> nrow()
+```
+
+### Appendix A.2.3 - Attempt to get missing ratings by simplifying the title
+
+```{r}
+#Checking for NA ratings fetched
+na_ratings = movies_with_ratings |> filter(is.na(imdb_rating))
+
+#Remove colon and everything after it for the movies which we coudn't fetch ratings
+na_ratings = na_ratings |>
+  mutate(title2 = str_trim(str_remove(title, ":.*$")))
+
+#Trying to fetch IMDB ratings again for the one we couldn't do so previously  
+movies_with_ratings_1 = na_ratings |>
+  rowwise() |>
+  mutate(imdb_rating = get_rating(title2, year)) |>
+  ungroup()
+
+movies_with_ratings_1 |> nrow()
+
+#Again checking for NA rating fetched 
+na_ratings2 = movies_with_ratings_1 |> filter(is.na(imdb_rating)) |> print()
+
+na_ratings2 |> nrow()
+```
+
+### Appendix A.2.4 - Merge both the rating tables and remove movies with NA ratings to obtain final cleaned dataset.
+
+```{r}
+# Left join to bring in updated ratings
+merged = movies_with_ratings |>
+  left_join(movies_with_ratings_1, by = "title", suffix = c("", "_new")) |>
+  mutate(imdb_rating = coalesce(imdb_rating, imdb_rating_new)) |>
+  select(-imdb_rating_new)
+
+#Removing the extra not required columns
+movie_data_rating = merged |>
+  select(-which(str_detect(names(merged), "_new")),-title2)
+
+#Remove all the NA value rows and complete the cleaning
+movie_data_rating_NoNa = na.omit(movie_data_rating)
+
+movie_data_rating_NoNa |> head(10) |> print()
+
+#Write the cleaned dataset to CSV file
+#write_csv(movie_data_rating_NoNa, "cleaned_dataset_sahil.csv")
+
+```
+
+
+## Appendix A.3 - Bonus Dataset transformations for the cleaned data. 
+
+### Appendix A.3.1 - Data Per Director
+
+```{r}
+#Dataset transformation for director per row
+final_data_per_dir = movie_data_rating_NoNa |>
+  separate_rows(director, sep = ",") |> mutate(director = str_trim(director))
+
+final_data_per_dir |> select(title, director) |> head(10) |> print()
+
+#write_csv(final_data_per_dir, "cleaned_dataset_director_perROW.csv")  
+```
+
+### Appendix A.3.2 - Data Per Cast
+
+```{r}
+#Dataset transformation for cast per row
+final_data_per_cast = movie_data_rating_NoNa |>
+  separate_rows(cast, sep = ",") |> mutate(cast = str_trim(cast))
+
+final_data_per_cast |> select(title, cast) |> head(10) |> print()
+
+#write_csv(final_data_per_cast, "cleaned_dataset_cast_perROW.csv")   
+```
+
+### Appendix A.3.3 - Data Per Genre
+
+```{r}
+#Dataset transformation for genre per row
+final_data_per_genre = movie_data_rating_NoNa |>
+  separate_rows(genre, sep = "•") |> mutate(genre = str_trim(genre))
+
+final_data_per_genre |> select(title, genre) |> head(10) |> print()
+
+#write_csv(final_data_per_genre, "cleaned_dataset_genre_perROW.csv")      
+```
+
+### Appendix A.3.4 - Data Per Director, Cast, Genre
+
+```{r}
+#Dataset transformation for atomic values for each cell
+final_data_per_dir_per_cast_per_genre = movie_data_rating_NoNa |>
+  separate_rows(director, sep = ",") |> mutate(director = str_trim(director)) |>
+  separate_rows(cast, sep = ",") |> mutate(cast = str_trim(cast)) |>
+  separate_rows(genre, sep = "•") |> mutate(genre = str_trim(genre))
+
+final_data_per_dir_per_cast_per_genre |> select(title, director, cast, genre) |> head(10) |> print()
+
+#write_csv(final_data_per_dir_per_cast_per_genre, "cleaned_dataset_master.csv")      
+```
+
+## Appendix A.4 - Final Cleaned Dataset and Insights. 
+
+```{r}
+
+master_data = movie_data_rating_NoNa
+
+# Print first 10 rows of the final dataset
+master_data |> head(10) |> print()
+```
+
+The dataset used is a cleaned version of the original and integrated data, with all missing values (NAs) removed.
+
+The dataset contains seven columns. Notably, the 'cast', 'directors' and 'genre' columns can contain multiple values, which should be separated for accurate analysis when examining individual actors or directors.
+
+<u><p style="font-size:40px;">Appendix B : Data Visualizations and Insights</p></u>
+
+## Appendix B.1 - Number of Movies per decade Analysis
+
+```{r}
+# Create decade column and summarize
+a = master_data |>
+  mutate(decade = floor(as.numeric(year) / 10) * 10) |>
+  group_by(decade) |>
+  summarise(total = n(), .groups = "drop")
+
+# Plot the results
+ggplot(a, aes(x = as.factor(decade), y = total)) +
+  geom_col(fill = "darkorange") +
+  labs(
+    title = "Number of Movies per Decade",
+    x = "Decade",
+    y = "Movie Count"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**<u>Summary:</u>**
+
+The number of movies steadily increased from the 1950s to the 2000s, peaking around 2000, before declining sharply in the 2010s and further in the 2020s. The lower count for the 2020s may be due to the decade still being in progress.
+
+## Appendix B.2 - IMDB ratings per decade Analysis
+
+```{r}
+
+master_data = master_data |>
+  mutate(year = as.numeric(year))
+
+
+decade = master_data |>
+  mutate(decade = floor(year / 10) * 10)
+
+ggplot(decade, aes(x = as.factor(decade), y = imdb_rating)) +
+  geom_boxplot() +
+  scale_x_discrete(name = "Decade") +
+  labs(title = "IMDb Ratings by Decade", y = "IMDb Rating") +
+  theme_minimal()
+
+
+```
+
+**<u>Key Observations:</u>**
+
+IMDB ratings have remained relatively steady from the 1950s to the 2020s, with 50% of the ratings consistently falling between 6.75 and 7.5 across decades, though each decade has its share of outliers.
+
+This stable range suggests that, on average, there has been neither significant improvement nor decline in filmmaking quality over the past 70 years. The highest-rated movie observed—a perfect 10—appeared in the 1950s, while the lowest-rated, at 2 out of 10, came from the 1980s. 
+
+Notably, movies from the 1980s appear to have received a weaker reception overall, as reflected by the generally lower placement of their boxplot compared to other decades.
+
+**<u>Summary:</u>**
+
+Film ratings have become more varied but stabilized in quality since the mid-20th century.
+Early cinema is underrepresented and may skew low due to lack of data or retrospective evaluation.
+The consistent median ratings from the 1950s onward show that audience expectations and critical standards have leveled out, despite increasing film production.
+
+## Appendix B.3 - Top Directors by Average IMDb Rating Analysis
+
+```{r}
+
+top_directors = master_data |>
+  group_by(director) |>
+  filter(n() >= 5) |>
+  summarise(avg_rating = mean(imdb_rating, na.rm = TRUE)) |>
+  arrange(desc(avg_rating)) |>
+  slice_head(n = 15)
+
+ggplot(top_directors, aes(x = reorder(director, avg_rating), y = avg_rating)) +
+  geom_col(fill = "lightblue") +
+  coord_flip() +
+  labs(title = "Top 15 Directors by Average IMDb Rating (min 5 movies)",
+       x = "Director", y = "Average IMDb Rating") + theme_minimal()
+
+```
+
+**<u>Key Observations:</u>**
+  
+Masaki Kobayashi leads the list with the highest average IMDb rating — just above 8.0 — suggesting strong consistency and audience acclaim across his works.
+
+Sergio Leone, and Christopher Nolan follow closely, reinforcing their reputation for producing critically acclaimed films with wide audience appeal.
+
+All directors in this list maintain average IMDb ratings above ~7.8, indicating that their filmographies are not just one-hit wonders but consistently well-received.
+
+**<u>Summary:</u>**
+
+A mix of international directors (e.g., Jean-Pierre Melville, Hayao Miyazaki, Tarkovsky) and modern mainstream directors (e.g., Nolan, Villeneuve, Cameron) suggests that excellence in movie directions spans both global cinema and Hollywood.
+
+## Appendix B.4 - Top Genre trends over the decades Analysis
+
+```{r}
+
+# Extract primary genre and compute decade
+genre_decade = master_data |>
+  mutate(year = as.numeric(year),
+         decade = floor(year / 10) * 10,
+         primary_genre = str_trim(str_split_fixed(genre, "•", 2)[, 1])) |>
+  filter(!is.na(primary_genre), !is.na(decade))
+
+# Count genres per decade
+genre_counts = genre_decade |>
+  group_by(decade, primary_genre) |>
+  summarise(count = n(), .groups = "drop")
+
+# Plot top genres (filtering top 7 overall for clarity)
+top_genres = genre_counts |>
+  group_by(primary_genre) |>
+  summarise(total = sum(count)) |>
+  arrange(desc(total)) |>
+  slice_head(n = 7) |>
+  pull(primary_genre)
+
+ggplot(genre_counts |>
+         filter(primary_genre %in% top_genres), 
+       aes(x = decade, y = count, color = primary_genre)) +
+  geom_line(size = 1.2) +
+  scale_x_continuous(breaks = seq(1950, 2020, by = 20), limits = c(1950, 2024)) +
+  labs(title = "Top Genre Trends by Decade",
+       x = "Decade", y = "Number of Movies", color = "Genre") +
+  theme_minimal()
+
+```
+
+**<u>Key Observations:</u>**
+
+<u>1.Drama dominates:</u>
+Drama has been the most consistently produced genre, especially peaking in the 1990s and 2000s.
+It shows a steady upward trend from 1960s to 1990s, followed by a sharp decline in the 2020s (likely due to incomplete data or limited releases post-2020).
+
+<u>2.Action & Comedy surged post-1970:</u>
+Both genres experience explosive growth starting in the 1970s, peaking around the 2000s–2010s.
+Reflects the rise of blockbusters, franchise films, and global streaming appeal.
+
+<u>3.Based-on-a-True-Story and Adventure grows steadily:</u>
+Real-life inspired films and Adventure gained popularity in the post-1980s era, likely due to more biopics and historical dramas and rise of enthusiasm for adventure.
+
+<u>4.Based-on-20th-Century-Literature remains steady but modest:</u>
+Remains a niche genre with stable, lower production volume across decades.
+
+<u>5.Comedy Drama:</u>
+Comedy had a stable and a visible rise in the 1950s–2000s, indicating a trend toward hybrid
+emotional storytelling.
+
+<u>6.Sharp drop after 2010:</u>
+The decline across all genres in the 2020s is likely due to:
+
+i)Fewer releases post-2020 (pandemic impact).
+
+ii)Limited dataset coverage for recent years.
+
+**<u>Summary</u>**
+
+This chart highlights how social tastes, media formats, and production trends have shifted over time. Drama remains the most produced, while Action, Adventure, and true-story adaptations have risen with modern cinema's commercial and emotional trends.
+
+## Appendix B.5 - Average Movie Runtime by Decade Analysis
+
+```{r}
+runtime_decade = master_data |>
+  mutate(year = as.numeric(year),
+         duration = as.numeric(duration),
+         decade = floor(year / 10) * 10) |>
+  filter(!is.na(duration), duration > 20, duration < 300)  # filtering unrealistic values
+
+runtime_trend = runtime_decade |>
+  group_by(decade) |>
+  summarise(avg_runtime = mean(duration, na.rm = TRUE), .groups = "drop")
+
+ggplot(runtime_trend, aes(x = decade, y = avg_runtime)) +
+  geom_line(color = "steelblue", size = 1.2) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = seq(1950, 2020, by = 10), limits = c(1950, 2024)) +
+  labs(title = "Average Movie Runtime by Decade",
+       x = "Decade", y = "Average Runtime (minutes)") +
+  theme_minimal()
+
+```
+
+**<u>Key Observations:</u>** 
+
+<u>1.Stabilization from 1950s–2000s (~100–110 mins):</u> 
+For about 6 decades, average runtime stays relatively stable. Hollywood and global films found an optimal storytelling length here.
+
+<u>2.Modern Increase in the 2020s (~120 mins):</u>
+Likely be attributed to several factors: streaming platforms enabling longer formats, the rise of superhero franchises, epic dramas, and multi-part stories, as well as reduced theatrical constraints, which offer directors greater creative freedom.
+
+## Appendix B.6 - Average Runtime by Genre and Decade Analysis
+
+```{r}
+
+# Prepare data
+runtime_by_genre = master_data |>
+  mutate(
+    year = as.numeric(year),
+    duration = as.numeric(duration),
+    decade = floor(year / 10) * 10,
+    primary_genre = str_trim(str_split_fixed(genre, "•", 2)[, 1])
+  ) |>
+  filter(!is.na(duration), duration > 20, duration < 300, !is.na(primary_genre), !is.na(decade))
+
+# Focus on top 5 most common genres
+top_genres = runtime_by_genre |>
+  count(primary_genre, sort = TRUE) |>
+  slice_head(n = 5) |>
+  pull(primary_genre)
+
+# Compute average runtime per genre per decade
+avg_runtime_genre = runtime_by_genre |>
+  filter(primary_genre %in% top_genres) |>
+  group_by(decade, primary_genre) |>
+  summarise(avg_runtime = mean(duration, na.rm = TRUE), .groups = "drop")
+
+# Plot
+ggplot(avg_runtime_genre, aes(x = decade, y = avg_runtime, color = primary_genre)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = seq(1950, 2020, by = 10), limits = c(1950, 2024)) +
+  labs(
+    title = "Average Runtime by Genre and Decade",
+    x = "Decade", y = "Average Runtime (minutes)",
+    color = "Genre"
+  ) +
+  theme_minimal()
+
+```
+
+
+```{r}
+ggplot(avg_runtime_genre, aes(x = decade, y = avg_runtime)) +
+  geom_line(color = "steelblue", size = 1) +
+  geom_point(color = "black", size = 2) +
+  facet_wrap(~ primary_genre) +
+  scale_x_continuous(breaks = seq(1950, 2020, by = 10), limits = c(1950, 2024)) +
+  labs(
+    title = "Average Movie Runtime by Genre and Decade (Faceted)",
+    x = "Decade", y = "Average Runtime (minutes)"
+  ) +
+  theme_minimal()
+
+```
+
+**<u>General Trend:</u>** 
+
+All genres show stable runtime over the decades except for 1960s where we see a sudden spike and finally a notable spike in the 2020s.
+
+**<u>The rise may be due to:</u>**
+
+Streaming platforms enabling more flexible formats.
+
+Increasing viewer tolerance for long-form storytelling.
+
+Bigger budgets, multi-part sagas, and extended cut.
+
+## Appendix B.7 - IMDB Rating vs Average Runtime by Genre Analysis
+
+```{r}
+ggplot(runtime_by_genre |>
+         filter(primary_genre %in% top_genres),
+       aes(x = duration, y = imdb_rating, color = primary_genre)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "loess", se = FALSE) +
+  labs(
+    title = "IMDb Rating vs Runtime by Genre",
+    x = "Runtime (minutes)", y = "IMDb Rating", color = "Genre"
+  ) +
+  theme_minimal()
+
+```
+
+**<u>Key Observations:</u>**
+
+<u>Adventure:</u> Longer Adventure movies tend to receive significantly higher ratings, especially beyond the 150-minute mark. Suggests that audiences reward deeper, expansive storytelling typical of epic adventures.
+
+<u>Comedy:</u> Shorter comedies (<90 mins) tend to get higher ratings. There’s a sudden drop in ratings if movie drags on beyond 90 mins mark which might be because of sturation of humour. A subtle improvement in ratings with increasing length, but still flats around 7.5—implying that comedy success is more about content than length.
+
+<u>Comedy Drama:</u> Shows a similar pattern to Comedy, but overall has higher ratings across the board. Ratings increase with length, especially beyond 200 mins, showing the value of combining emotional weight with humor.
+
+<u>Action:</u> Longer Action movies tend to receive significantly higher ratings as the duration increases. 
+
+<u>Drama:</u> Fairly stable trend, with moderate increases until ~180 mins. Beyond that, ratings stabilize or dip, possibly reflecting diminishing returns for overly long dramas.
+
+**<u>Summary:</u>** 
+
+Longer runtimes tend to correlate with higher ratings for genres like Adventure, Drama, and Comedy Drama. However, extreme runtimes do not necessarily lead to higher ratings and may hurt pacing and engagement.
+
+## Appendix B.8 - Top 15 most frequent Actors Analysis
+
+```{r}
+
+cast_long = master_data |>
+  select(title, year, imdb_rating, cast) |>
+  separate_rows(cast, sep = ",\\s*") |>
+  mutate(cast = str_squish(cast)) |>
+  filter(cast != "")
+
+actor_counts = cast_long |>
+  count(cast, sort = TRUE)
+
+actor_ratings = cast_long |>
+  group_by(cast) |>
+  summarise(
+    num_movies = n(),
+    avg_rating = mean(imdb_rating, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  filter(num_movies >= 5) |>
+  arrange(desc(avg_rating))
+
+```
+
+```{r}
+top_actors = actor_counts |> slice_max(n, n = 15)
+
+ggplot(top_actors, aes(x = reorder(cast, n), y = n)) +
+  geom_col(fill = "skyblue") +
+  coord_flip() +
+  labs(title = "Top 15 Most Frequent Actors", x = "Actor", y = "Number of Movies") +
+  theme_minimal()
+
+```
+
+```{r}
+cast_long = cast_long |> 
+  mutate(year = as.numeric(year)) |> 
+  filter(!is.na(year))
+
+# Get top 15 most frequent actors
+top_actors = cast_long |>
+  count(cast, sort = TRUE) |>
+  slice_max(n, n = 15) |>
+  pull(cast)
+
+# Filter for those actors and calculate decade
+actor_decades = cast_long |>
+  filter(cast %in% top_actors) |>
+  mutate(decade = floor(year / 10) * 10)
+
+# Group and count
+actor_decade_counts = actor_decades |>
+  group_by(cast, decade) |>
+  summarise(movie_count = n(), .groups = "drop")
+
+
+ggplot(actor_decade_counts, aes(x = decade, y = movie_count)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~ cast, scales = "free_y") +
+  scale_x_continuous(breaks = seq(1950, 2020, by = 10)) +
+  labs(title = "Movies Released per Decade for Top 15 Frequent Actors",
+       x = "Decade", y = "Number of Movies") +
+  theme_minimal()
+
+```
+
+**<u>Summary:</u>**
+
+Robert De Niro, Tom Hanks, Nicolas Cage, and Clint Eastwood dominate the charts, each appearing in over 40 movies between the 1950s and 2020s.
+
+Notably, the list is dominated by Hollywood actors—which isn't surprising given Hollywood’s historically high volume of film production compared to international film industries.
+
+## Appendix B.9 - Top 15 Actors by Avg IMDB Rating Analysis
+
+```{r}
+top_rated_actors = actor_ratings |> slice_max(avg_rating, n = 15)
+
+ggplot(top_rated_actors, aes(x = reorder(cast, avg_rating), y = avg_rating)) +
+  geom_col(fill = "lightgreen") +
+  coord_flip() +
+  labs(title = "Top 15 Actors by Avg IMDb Rating (min 5 movies)", x = "Actor", y = "Avg IMDb Rating") +
+  theme_minimal()
+
+```
+
+
+```{r}
+
+top_actor_names = top_rated_actors$cast
+
+cast_decade = cast_long |>
+  filter(cast %in% top_actor_names) |>
+  mutate(decade = floor(as.numeric(year) / 10) * 10)
+actor_decade_counts <- cast_decade |>
+  group_by(cast, decade) |>
+  summarise(movie_count = n(), .groups = "drop")
+
+
+ggplot(actor_decade_counts, aes(x = decade, y = movie_count, fill = cast)) +
+  geom_col(position = "dodge") +
+  scale_x_continuous(breaks = seq(1950, 2020, by = 10)) +
+  labs(title = "Movies Released per Decade for Top 15 Actors",
+       x = "Decade", y = "Number of Movies") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(ncol = 3))
+
+```
+
+**<u>Summary:</u>**
+
+An important observation is that when IMDB ratings are used to identify top actors, the charts are largely dominated by actors from international film industries rather than Hollywood.
+
+A possible explanation is that these international actors appeared in fewer films compared to their Hollywood counterparts, and the limited number of roles they took on were rated more highly—resulting in a higher average IMDB rating.
